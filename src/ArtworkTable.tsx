@@ -18,7 +18,7 @@ const ArtworkTable: React.FC = () => {
     const [artworks, setArtworks] = useState<Artwork[]>([]);
     const [totalRecords, setTotalRecords] = useState<number>(0);
     const [first, setFirst] = useState<number>(0);
-    const [selectedRows, setSelectedRows] = useState<{ [key: number]: Artwork }>({});
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [showInput, setShowInput] = useState<boolean>(false);
     const [inputValue, setInputValue] = useState<number>(0);
@@ -43,16 +43,22 @@ const ArtworkTable: React.FC = () => {
     };
 
     const handleSubmit = () => {
+        // Bulk select first N artworks from current page
         const selectedItems = artworks.slice(0, inputValue);
-        const selectedMap: { [key: number]: Artwork } = {};
-        selectedItems.forEach(item => {
-            selectedMap[item.id] = item;
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            selectedItems.forEach(item => newSet.add(item.id));
+            return newSet;
         });
-        setSelectedRows(prev => ({ ...prev, ...selectedMap }));
         setShowInput(false);
     };
 
-    const selectedArray = Object.values(selectedRows);
+    // Array of selected artworks for current page
+    const currentPageSelection = artworks.filter(a => selectedIds.has(a.id));
+    // Array of all selected artworks (across all pages)
+    const selectedArray = Array.from(selectedIds).map(id =>
+        artworks.find(a => a.id === id)
+    ).filter(Boolean) as Artwork[];
 
     const headerTemplate = () => (
         <span
@@ -89,14 +95,17 @@ const ArtworkTable: React.FC = () => {
 
             <DataTable
                 value={artworks}
-                selection={selectedArray}
+                selection={currentPageSelection}
                 onSelectionChange={(e) => {
                     const selected: Artwork[] = e.value;
-                    const selectedMap: { [key: number]: Artwork } = {};
-                    selected.forEach((item) => {
-                        selectedMap[item.id] = item;
+                    setSelectedIds(prev => {
+                        const newSet = new Set(prev);
+                        // Remove all current page IDs
+                        artworks.forEach(item => newSet.delete(item.id));
+                        // Add newly selected IDs
+                        selected.forEach(item => newSet.add(item.id));
+                        return newSet;
                     });
-                    setSelectedRows(prev => ({ ...prev, ...selectedMap }));
                 }}
                 selectionMode="checkbox"
                 dataKey="id"
@@ -121,9 +130,10 @@ const ArtworkTable: React.FC = () => {
             <div style={{ marginTop: '20px' }}>
                 <h3>Selected Artworks</h3>
                 <ul>
-                    {selectedArray.map((item) => (
-                        <li key={item.id}>{item.title}</li>
-                    ))}
+                    {Array.from(selectedIds).map(id => {
+                        const item = artworks.find(a => a.id === id);
+                        return item ? <li key={item.id}>{item.title}</li> : null;
+                    })}
                 </ul>
             </div>
         </div>
